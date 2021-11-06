@@ -1,5 +1,6 @@
 import json
 from operator import attrgetter, itemgetter
+from django.forms.widgets import CheckboxSelectMultiple
 
 import pyotp
 import webauthn
@@ -9,7 +10,7 @@ from django.contrib.auth.forms import AuthenticationForm
 from django.core.exceptions import ValidationError
 from django.core.validators import RegexValidator
 from django.db.models import Q
-from django.forms import BooleanField, CharField, ChoiceField, Form, ModelForm, MultipleChoiceField
+from django.forms import BooleanField, CharField, ChoiceField, Form, ModelForm, MultipleChoiceField, fields
 from django.urls import reverse_lazy
 from django.utils.translation import gettext_lazy as _
 
@@ -17,6 +18,11 @@ from django_ace import AceWidget
 from judge.models import Contest, Language, Organization, Problem, Profile, Submission, WebAuthnCredential
 from judge.utils.subscription import newsletter_id
 from judge.widgets import HeavyPreviewPageDownWidget, Select2MultipleWidget, Select2Widget
+from judge.widgets.martor import MartorWidget
+from judge.widgets.select2 import HeavySelect2MultipleWidget
+from judge.widgets.checkbox import CheckboxSelectMultipleWithSelectAll
+from judge.admin.problem import ProblemSolutionForm
+from judge.models.problem import Solution
 
 TOTP_CODE_LENGTH = 6
 
@@ -284,3 +290,48 @@ class ContestCloneForm(Form):
         if Contest.objects.filter(key=key).exists():
             raise ValidationError(_('Contest with key already exists.'))
         return key
+
+
+class ProblemCreateForm(ModelForm):
+
+    def __init__(self, *args, **kwargs):
+        super(ProblemCreateForm, self).__init__(*args, **kwargs)
+        self.fields['authors'].widget.can_add_related = False
+        self.fields['curators'].widget.can_add_related = False
+        self.fields['testers'].widget.can_add_related = False
+        self.fields['allowed_languages'].widget.can_add_related = False
+
+    class Meta:
+        model = Problem
+        fields = [
+            'code', 'name', 'is_public', 'is_manually_managed', 'date',
+            'authors', 'curators', 'testers',
+            'is_organization_private', 'organizations', 
+            'submission_source_visibility_mode', 'is_full_markup',
+            'description', 'license',
+            'time_limit', 'memory_limit', 'allowed_languages',
+            'types', 'group',
+        ]
+        widgets = {
+            'authors': HeavySelect2MultipleWidget(data_view='profile_select2', attrs={'style': 'width: 25%'}),
+            'curators': HeavySelect2MultipleWidget(data_view='profile_select2', attrs={'style': 'width: 25%'}),
+            'testers': HeavySelect2MultipleWidget(data_view='profile_select2', attrs={'style': 'width: 25%'}),
+            'organizations': HeavySelect2MultipleWidget(data_view='organization_select2', attrs={'style': 'width: 50%'}),
+            'types': Select2MultipleWidget(attrs={'style': 'width: 25%'}),
+            'group': Select2Widget(attrs={'style': 'width: 25%'}),
+            'description': MartorWidget(attrs={'data-markdownfy-url': reverse_lazy('problem_preview')}),
+            'allowed_languages': CheckboxSelectMultipleWithSelectAll,
+        }
+
+
+SolutionInlineForm = forms.inlineformset_factory(
+    Problem,
+    Solution,
+    form=ProblemSolutionForm,
+    fields=(
+        'is_public', 'publish_on', 'authors', 'content',
+    ),
+    extra=1,
+    can_delete=True,
+    can_order=False,
+)

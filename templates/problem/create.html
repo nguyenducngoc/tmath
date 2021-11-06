@@ -38,6 +38,7 @@
         <div>
         <fieldset class="module aligned">
         {% for item in form %}
+            {% if item.id_for_label %}
             <div class="form-row field-{{ str(item.id_for_label).split('id_')[1] }}">
                 <div>
                 <label class="required" for="{{ item.id_for_label }}"> {{ item.label }} </label>
@@ -49,26 +50,17 @@
                 {% endif %}
                 </div>
             </div>
+            {% endif %}
         {% endfor %}
         </fieldset>
         <fieldset class="module aligned">
-        <h2>{{ _('Solution') }}</h2>
-        {% for item in solution_form %}
-            <div class="form-row field-{{ str(item.id_for_label).split('id_')[1] }}">
-                <div>
-                <label class="required" for="{{ item.id_for_label }}"> {{ item.label }} </label>
-                {{ item }}
-                {% if item.help_text %}
-                    <div class="help">
-                        {{ item.help_text }}
-                    </div>
-                {% endif %}
+            <h2>Language</h2>
+            <div class="related-widget-wrapper">
+                <div class='form-row field-allowed_languages'>
+                    <label class="required"> {{ form.allowed_languages.label }} </label>
+                    {{ form.allowed_languages }}
                 </div>
             </div>
-        {% endfor %}
-        </fieldset>
-        <fieldset>
-            {{ language_form }}
         </fieldset>
         <button style="float:right;" type="submit">{{ _('Create!') }}</button>
         </div>

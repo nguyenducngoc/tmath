@@ -21,12 +21,13 @@ from django.utils.html import escape, format_html
 from django.utils.safestring import mark_safe
 from django.utils.translation import gettext as _, gettext_lazy
 from django.views.generic import ListView, View
+from django.views.generic.edit import CreateView
 from django.views.generic.base import TemplateResponseMixin
 from django.views.generic.detail import SingleObjectMixin
 from reversion import revisions
 
 from judge.comments import CommentedDetailView
-from judge.forms import ProblemCloneForm, ProblemSubmitForm
+from judge.forms import ProblemCloneForm, ProblemCreateForm, ProblemSubmitForm, SolutionInlineForm
 from judge.models import ContestSubmission, Judge, Language, Problem, ProblemGroup, \
     ProblemTranslation, ProblemType, RuntimeVersion, Solution, Submission, SubmissionSource, \
     TranslatedProblemForeignKeyQuerySet
@@ -720,3 +721,49 @@ class ProblemClone(ProblemMixin, PermissionRequiredMixin, TitleMixin, SingleObje
             revisions.set_comment(_('Cloned problem from %s') % old_code)
 
         return HttpResponseRedirect(reverse('admin:judge_problem_change', args=(problem.id,)))
+
+
+class ProblemCreate(ProblemMixin, PermissionRequiredMixin, TitleMixin, CreateView):
+    title = _('Create Problem')
+    template_name = 'problem/create.html'
+    success_url = '/'
+    model = Problem
+    permission_required = 'judge.add_problem'
+    form_class = ProblemCreateForm
+
+    def get(self, request, *args, **kwargs):
+        self.object = None
+        form_class = self.get_form_class()
+        form = self.get_form(form_class)
+        solution_form = SolutionInlineForm()
+
+        return self.render_to_response(
+            self.get_context_data(form=form, solution_form=solution_form)
+        )
+    
+    def post(self, request, *args, **kwargs):
+        self.object = None
+        form_class = self.get_form_class()
+        form = self.get_form(form_class)
+        solution_form = SolutionInlineForm(self.request.POST)
+
+        return self.form_valid(form, solution_form)
+    
+    def form_valid(self, form, solution_form):
+        self.object = form.save()
+        solution_form.instance = self.object
+        solution_form.save()
+
+        return HttpResponseRedirect(self.success_url())
+
+    def get_context_data(self, **kwargs):
+        data = super(ProblemCreate, self).get_context_data(**kwargs)
+
+        if self.request.POST:
+            data['form'] = ProblemCreateForm(self.request.POST)
+            data['solution_form'] = SolutionInlineForm(self.request.POST)
+        else:
+            data['form'] = ProblemCreateForm()
+            data['solution_form'] = SolutionInlineForm()
+        
+        return data
